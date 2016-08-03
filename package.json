@@ -1,0 +1,14 @@
+{
+  "name": "jointjs",
+  "version": "0.1.0",
+  "title": "JointJS",
+  "description": "",
+  "dependencies": {},
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-contrib-concat": "^1.0.1",
+    "grunt-contrib-copy": "^1.0.0",
+    "grunt-newer": "^1.2.0",
+    "jointjs": "0.9.10"
+  }
+}

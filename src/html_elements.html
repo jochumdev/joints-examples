@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JointJS Test</title>
+
+  <link rel="stylesheet" type="text/css" href="css/joint.min.css" />
+  <script src="js/jquery.min.js"></script>
+  <script src="js/lodash.min.js"></script>
+  <script src="js/backbone-min.js"></script>
+  <script src="js/joint.min.js"></script>
+  <style>
+  #paper {
+     position: relative;
+     border: 1px solid gray;
+     display: inline-block;
+     background: transparent;
+     overflow: hidden;
+  }
+  #paper svg {
+     background: transparent;
+  }
+  #paper svg .link {
+     z-index: 2;
+  }
+  .html-element {
+     position: absolute;
+     background: #3498DB;
+     /* Make sure events are propagated to the JointJS element so, e.g. dragging works.*/
+     pointer-events: none;
+     -webkit-user-select: none;
+     border-radius: 4px;
+     border: 2px solid #2980B9;
+     box-shadow: inset 0 0 5px black, 2px 2px 1px gray;
+     padding: 5px;
+     box-sizing: border-box;
+     z-index: 2;
+  }
+  .html-element select,
+  .html-element input,
+  .html-element button {
+     /* Enable interacting with inputs only. */
+     pointer-events: auto;
+  }
+  .html-element button.delete {
+     color: white;
+     border: none;
+     background-color: #C0392B;
+     border-radius: 20px;
+     width: 15px;
+     height: 15px;
+     line-height: 15px;
+     text-align: middle;
+     position: absolute;
+     top: -15px;
+     left: -15px;
+     padding: 0;
+     margin: 0;
+     font-weight: bold;
+     cursor: pointer;
+  }
+  .html-element button.delete:hover {
+     width: 20px;
+     height: 20px;
+     line-height: 20px;
+  }
+  .html-element select {
+     position: absolute;
+     right: 2px;
+     bottom: 28px;
+  }
+  .html-element input {
+     position: absolute;
+     bottom: 0;
+     left: 0;
+     right: 0;
+     border: none;
+     color: #333;
+     padding: 5px;
+     height: 16px;
+  }
+  .html-element label {
+     color: #333;
+     text-shadow: 1px 0 0 lightgray;
+     font-weight: bold;
+  }
+  .html-element span {
+     position: absolute;
+     top: 2px;
+     right: 9px;
+     color: white;
+     font-size: 10px;
+  }
+  </style>
+</head>
+<body>
+<p><a href="http://www.jointjs.com/tutorial/html-elements" target="_blank">HTML Elements</a> example from the JointJS tutorial.</p>
+<div id="paper"></div>
+<script type="text/javascript">
+
+  var graph = new joint.dia.Graph;
+  var paper = new joint.dia.Paper({
+      el: $('#paper'),
+      width: 650,
+      height: 400,
+      model: graph,
+      gridSize: 1
+  });
+
+
+  // Create a custom element.
+  // ------------------------
+
+  joint.shapes.html = {};
+  joint.shapes.html.Element = joint.shapes.basic.Rect.extend({
+      defaults: joint.util.deepSupplement({
+          type: 'html.Element',
+          attrs: {
+              rect: { stroke: 'none', 'fill-opacity': 0 }
+          }
+      }, joint.shapes.basic.Rect.prototype.defaults)
+  });
+
+  // Create a custom view for that element that displays an HTML div above it.
+  // -------------------------------------------------------------------------
+
+  joint.shapes.html.ElementView = joint.dia.ElementView.extend({
+
+      template: [
+          '<div class="html-element">',
+          '<button class="delete">x</button>',
+          '<label></label>',
+          '<span></span>', '<br/>',
+          '<select><option>--</option><option>one</option><option>two</option></select>',
+          '<input type="text" value="I\'m HTML input" />',
+          '</div>'
+      ].join(''),
+
+      initialize: function() {
+          _.bindAll(this, 'updateBox');
+          joint.dia.ElementView.prototype.initialize.apply(this, arguments);
+
+          this.$box = $(_.template(this.template)());
+          // Prevent paper from handling pointerdown.
+          this.$box.find('input,select').on('mousedown click', function(evt) { evt.stopPropagation(); });
+          // This is an example of reacting on the input change and storing the input data in the cell model.
+          this.$box.find('input').on('change', _.bind(function(evt) {
+              this.model.set('input', $(evt.target).val());
+          }, this));
+          this.$box.find('select').on('change', _.bind(function(evt) {
+              this.model.set('select', $(evt.target).val());
+          }, this));
+          this.$box.find('select').val(this.model.get('select'));
+          this.$box.find('.delete').on('click', _.bind(this.model.remove, this.model));
+          // Update the box position whenever the underlying model changes.
+          this.model.on('change', this.updateBox, this);
+          // Remove the box when the model gets removed from the graph.
+          this.model.on('remove', this.removeBox, this);
+
+          this.updateBox();
+      },
+      render: function() {
+          joint.dia.ElementView.prototype.render.apply(this, arguments);
+          this.paper.$el.prepend(this.$box);
+          this.updateBox();
+          return this;
+      },
+      updateBox: function() {
+          // Set the position and dimension of the box so that it covers the JointJS element.
+          var bbox = this.model.getBBox();
+          // Example of updating the HTML with a data stored in the cell model.
+          this.$box.find('label').text(this.model.get('label'));
+          this.$box.find('span').text(this.model.get('select'));
+          this.$box.css({ width: bbox.width, height: bbox.height, left: bbox.x, top: bbox.y, transform: 'rotate(' + (this.model.get('angle') || 0) + 'deg)' });
+      },
+      removeBox: function(evt) {
+          this.$box.remove();
+      }
+  });
+
+  // Create JointJS elements and add them to the graph as usual.
+  // -----------------------------------------------------------
+
+  var el1 = new joint.shapes.html.Element({ position: { x: 80, y: 80 }, size: { width: 170, height: 100 }, label: 'I am HTML', select: 'one' });
+  var el2 = new joint.shapes.html.Element({ position: { x: 370, y: 160 }, size: { width: 170, height: 100 }, label: 'Me too', select: 'two' });
+  var l = new joint.dia.Link({
+      source: { id: el1.id },
+      target: { id: el2.id },
+      attrs: { '.connection': { 'stroke-width': 5, stroke: '#34495E' } }
+  });
+
+  graph.addCells([el1, el2, l]);
+
+</script>
+</body>
+</html>
